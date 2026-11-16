@@ -227,7 +227,8 @@ async function firebase() {
 // The GitHub key lives in Firestore at admin/github; rules let only the admin account read or write it.
 async function loadKey() {
   const { fs, db } = await firebase();
-  const snap = await fs.getDoc(fs.doc(db, 'admin', 'github'));
+  const snap = await Promise.race([fs.getDoc(fs.doc(db, 'admin', 'github')),
+    new Promise((_, rej) => setTimeout(() => rej(Object.assign(new Error('no-firestore'), { code: 'no-firestore' })), 12000))]);
   return snap.exists() ? snap.data().token : '';
 }
 const b64 = buf => { let s = ''; const b = new Uint8Array(buf); for (let i = 0; i < b.length; i += 0x8000) s += String.fromCharCode(...b.subarray(i, i + 0x8000)); return btoa(s); };
@@ -268,7 +269,8 @@ $('#loginForm').onsubmit = async e => {
     const c = err.code || '';
     msg(/invalid-credential|wrong-password|user-not-found|invalid-email/.test(c) ? 'اسم المستخدم أو كلمة المرور غير صحيحة.'
       : /too-many-requests/.test(c) ? 'محاولات كثيرة، حاولي بعد قليل.'
-      : /permission-denied/.test(c) ? 'هذا الحساب ليس حساب المشرفة.' : 'تعذّر الدخول: ' + (err.message || c));
+      : /permission-denied/.test(c) ? 'هذا الحساب ليس حساب الأدمن، أو قواعد Firestore لم تُضبط بعد.'
+      : /no-firestore|unavailable|failed-precondition/.test(c) ? 'تم الدخول، لكن قاعدة بيانات Firestore غير مفعّلة بعد في Firebase.' : 'تعذّر الدخول: ' + (err.message || c));
   }
 };
 async function afterSignIn() {
@@ -300,28 +302,37 @@ $('#keyForm').onsubmit = async e => {
 $('#adminBtn').onclick = () => {
   const last = CLIPS.reduce((m, c) => Math.max(m, c.to), 0);
   const f = $('#uploadForm');
-  if (!f.from.value && last < 286) { f.from.value = last + 1; }
   $('#upMsg').textContent = ''; $('#adminSheet').showModal();
 };
 $('#uploadForm').onsubmit = async e => {
   e.preventDefault();
   const form = e.target, f = new FormData(form), file = f.get('file');
-  const from = +f.get('from'), to = +f.get('to');
+  const from = +f.get('from') || 0, to = +f.get('to') || 0, auto = !from && !to;
   const msg = t => $('#upMsg').textContent = t;
+  if (!auto && (!from || !to)) return msg('اكتبي رقم أول آية وآخر آية، أو اتركيهما فارغين للتحديد التلقائي.');
   if (from > to) return msg('رقم "من" يجب ألا يكون أكبر من "إلى".');
   if (file.size > 95 * 1024 * 1024) return msg('الملف أكبر من 95 ميجا.');
   const btn = form.querySelector('button[type=submit]'); btn.disabled = true;
   try {
+    const ext = (file.name.split('.').pop() || 'm4a').toLowerCase().replace('mp4', 'm4a');
+    const meta = { title: f.get('title') || '', speaker: f.get('speaker') || '' };
+    if (auto) {
+      const name = new Date().toISOString().replace(/[:.]/g, '-') + '.' + ext;
+      msg('جاري رفع الملف الصوتي…');
+      await gh('/contents/audio/inbox/' + name + '.json', { method: 'PUT', body: JSON.stringify({ message: 'Recording info ' + name, content: utf8b64(JSON.stringify(meta)), branch: BRANCH }) });
+      await gh('/contents/audio/inbox/' + name, { method: 'PUT', body: JSON.stringify({ message: 'New recording ' + name + ' (detect ayat)', content: b64(await file.arrayBuffer()), branch: BRANCH }) });
+      form.reset(); msg('تم الرفع ✓ سيتم تحديد الآيات تلقائياً، ويظهر التسجيل في مكانه خلال 10 دقائق تقريباً.');
+      btn.disabled = false; return;
+    }
     const base = from === to ? `${from}` : `${from}-${to}`;
     let id = base; let n = 2; while (CLIPS.some(c => c.id === id)) id = `${base}_${n++}`;
-    const ext = (file.name.split('.').pop() || 'm4a').toLowerCase().replace('mp4', 'm4a');
     const path = `audio/${id}.${ext}`;
     msg('جاري قراءة الملف…');
     const duration = await new Promise(r => { const a = new Audio(); a.preload = 'metadata'; a.src = URL.createObjectURL(file); a.onloadedmetadata = () => r(Math.round(a.duration) || null); a.onerror = () => r(null); });
     msg('جاري رفع الملف الصوتي…');
     await gh('/contents/' + path, { method: 'PUT', body: JSON.stringify({ message: `Add recording ${id} (ayat ${from}-${to})`, content: b64(await file.arrayBuffer()), branch: BRANCH }) });
     msg('جاري تحديث قائمة التسجيلات…');
-    const clip = { id, from, to, src: path, title: f.get('title') || '', speaker: f.get('speaker') || '', duration, added: new Date().toISOString().slice(0, 10) };
+    const clip = { id, from, to, src: path, ...meta, duration, added: new Date().toISOString().slice(0, 10) };
     for (let attempt = 0; attempt < 3; attempt++) {
       const cur = await gh('/contents/data/clips.json?ref=' + BRANCH, { cache: 'no-store' });
       const list = JSON.parse(new TextDecoder().decode(Uint8Array.from(atob(cur.content.replace(/\n/g, '')), c => c.charCodeAt(0))));

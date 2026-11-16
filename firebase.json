@@ -9,7 +9,10 @@
       ".github/**",
       "**/.*",
       "**/node_modules/**",
-      "firestore.rules"
+      "firestore.rules",
+      "tools/**",
+      "audio/inbox/**",
+      "audio/unmatched/**"
     ],
     "headers": [
       {
@@ -40,8 +43,5 @@
         ]
       }
     ]
-  },
-  "firestore": {
-    "rules": "firestore.rules"
   }
 }

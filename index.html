@@ -94,7 +94,7 @@
 
 <!-- admin login -->
 <dialog id="loginSheet" class="sheet">
-  <div class="sheet-head"><h2>دخول المشرفة</h2><button class="icon-btn" data-close aria-label="إغلاق">✕</button></div>
+  <div class="sheet-head"><h2>دخول الأدمن</h2><button class="icon-btn" data-close aria-label="إغلاق">✕</button></div>
   <form id="loginForm">
     <label>اسم المستخدم <input type="text" name="user" autocomplete="username" autocapitalize="none" required dir="ltr"></label>
     <label>كلمة المرور <input type="password" name="pass" autocomplete="current-password" required dir="ltr"></label>
@@ -115,9 +115,10 @@
   <form id="uploadForm">
     <label>الملف الصوتي <input type="file" name="file" accept="audio/*,video/mp4,.m4a,.mp3" required></label>
     <div class="row">
-      <label>من الآية <input type="number" name="from" min="1" max="286" required></label>
-      <label>إلى الآية <input type="number" name="to" min="1" max="286" required></label>
+      <label>من الآية <input type="number" name="from" min="1" max="286" placeholder="تلقائي"></label>
+      <label>إلى الآية <input type="number" name="to" min="1" max="286" placeholder="تلقائي"></label>
     </div>
+    <p class="muted">اتركي رقمي الآيات فارغين ليحددهما التطبيق تلقائياً من الصوت.</p>
     <label>العنوان (اختياري) <input type="text" name="title" placeholder="مثلاً: الدرس الأول"></label>
     <label>الشيخ / المصدر (اختياري) <input type="text" name="speaker"></label>
     <button class="wide" type="submit">رفع</button>
