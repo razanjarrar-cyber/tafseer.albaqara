@@ -1,0 +1,108 @@
+<!doctype html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>تفسير سورة البقرة</title>
+<meta name="description" content="تسجيلات تفسير سورة البقرة مرتبة حسب الآيات مع صفحات المصحف">
+<meta name="theme-color" content="#1f4d3a">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" href="icons/icon-192.png">
+<link rel="apple-touch-icon" href="icons/icon-192.png">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="تفسير البقرة">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Amiri:wght@400;700&family=IBM+Plex+Sans+Arabic:wght@400;500;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<header class="top">
+  <div class="brand">
+    <img src="icons/icon-192.png" alt="" width="36" height="36">
+    <div>
+      <h1>تفسير سورة البقرة</h1>
+      <p id="stats" class="muted">…</p>
+    </div>
+  </div>
+  <button id="adminBtn" class="icon-btn" hidden title="إضافة تسجيل" aria-label="إضافة تسجيل">＋</button>
+</header>
+
+<nav class="tabs" role="tablist">
+  <button role="tab" data-tab="tree" class="active">شجرة الآيات</button>
+  <button role="tab" data-tab="list">التسجيلات</button>
+</nav>
+
+<main>
+  <section id="tree" class="view"></section>
+  <section id="list" class="view" hidden></section>
+</main>
+
+<!-- ayah sheet: recordings covering an ayah -->
+<dialog id="ayahSheet" class="sheet">
+  <div class="sheet-head"><h2 id="ayahSheetTitle"></h2><button class="icon-btn" data-close aria-label="إغلاق">✕</button></div>
+  <p id="ayahSheetText" class="ayah-text"></p>
+  <div id="ayahSheetClips"></div>
+</dialog>
+
+<!-- full player -->
+<section id="player" class="player" hidden aria-label="المشغّل">
+  <div class="player-head">
+    <button id="playerMin" class="icon-btn" aria-label="تصغير">⌄</button>
+    <div class="player-title"><strong id="pTitle"></strong><span id="pRange" class="muted"></span></div>
+    <button id="pShare" class="icon-btn" aria-label="مشاركة">⤴</button>
+  </div>
+  <div id="pages" class="pages" dir="rtl"></div>
+  <div id="pageDots" class="dots"></div>
+  <div class="controls">
+    <input id="seek" type="range" min="0" max="1000" value="0" aria-label="الموضع">
+    <div class="times"><span id="tCur">0:00</span><span id="tDur">0:00</span></div>
+    <div class="buttons">
+      <button id="speed" class="pill" aria-label="السرعة">1×</button>
+      <button id="fwd" class="round" aria-label="تقديم 15 ثانية">+15</button>
+      <button id="play" class="round big" aria-label="تشغيل">▶</button>
+      <button id="back" class="round" aria-label="رجوع 15 ثانية">-15</button>
+      <button id="next" class="pill" aria-label="التسجيل التالي">التالي</button>
+    </div>
+  </div>
+</section>
+
+<!-- mini player -->
+<div id="mini" class="mini" hidden>
+  <button id="miniPlay" class="round" aria-label="تشغيل">▶</button>
+  <div class="mini-info"><strong id="mTitle"></strong><span id="mRange" class="muted"></span></div>
+  <div class="mini-bar"><div id="mProg"></div></div>
+</div>
+
+<!-- share sheet -->
+<dialog id="shareSheet" class="sheet">
+  <div class="sheet-head"><h2>مشاركة التسجيل</h2><button class="icon-btn" data-close aria-label="إغلاق">✕</button></div>
+  <button id="shareLink" class="wide">مشاركة الرابط</button>
+  <button id="shareFile" class="wide secondary">مشاركة الملف الصوتي (واتساب وغيره)</button>
+  <button id="copyLink" class="wide secondary">نسخ الرابط</button>
+  <p id="shareMsg" class="muted"></p>
+</dialog>
+
+<!-- admin upload -->
+<dialog id="adminSheet" class="sheet">
+  <div class="sheet-head"><h2>إضافة تسجيل</h2><button class="icon-btn" data-close aria-label="إغلاق">✕</button></div>
+  <div id="authBox"></div>
+  <form id="uploadForm" hidden>
+    <label>الملف الصوتي <input type="file" name="file" accept="audio/*,video/mp4" required></label>
+    <div class="row">
+      <label>من الآية <input type="number" name="from" min="1" max="286" required></label>
+      <label>إلى الآية <input type="number" name="to" min="1" max="286" required></label>
+    </div>
+    <label>العنوان (اختياري) <input type="text" name="title" placeholder="مثلاً: الدرس الأول"></label>
+    <label>الشيخ / المصدر (اختياري) <input type="text" name="speaker"></label>
+    <button class="wide" type="submit">رفع</button>
+    <progress id="upProg" max="100" value="0" hidden></progress>
+    <p id="upMsg" class="muted"></p>
+  </form>
+</dialog>
+
+<audio id="audio" preload="metadata"></audio>
+<script src="firebase-config.js"></script>
+<script type="module" src="app.js"></script>
+</body>
+</html>

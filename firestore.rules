@@ -1,0 +1,10 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    match /clips/{id} {
+      allow read: if true;
+      // ضعي بريدك هنا (نفس البريد في firebase-config.js)
+      allow write: if request.auth != null && request.auth.token.email in ['YOUR_EMAIL@gmail.com'];
+    }
+  }
+}
