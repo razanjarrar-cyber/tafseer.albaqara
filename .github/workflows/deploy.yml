@@ -4,7 +4,7 @@ on:
     branches: [main]
   workflow_dispatch:
   workflow_run:
-    workflows: ['Detect ayat']
+    workflows: ['Detect ayat', 'Import from Google Drive']
     types: [completed]
 concurrency:
   group: deploy
