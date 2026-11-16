@@ -1,5 +1,5 @@
 // يعمل التطبيق دون اتصال: الواجهة وبيانات الآيات وصفحات المصحف تُخزَّن عند أول فتح
-const V = 'tafseer-v2';
+const V = 'tafseer-v3';
 const SHELL = ['./', 'index.html', 'style.css', 'app.js', 'manifest.webmanifest', 'data/ayat.json', 'icons/icon-192.png', 'icons/icon-512.png'];
 self.addEventListener('install', e => { e.waitUntil(caches.open(V).then(c => c.addAll(SHELL))); self.skipWaiting(); });
 self.addEventListener('activate', e => {

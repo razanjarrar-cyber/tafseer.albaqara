@@ -17,6 +17,14 @@
 <link rel="stylesheet" href="style.css">
 </head>
 <body>
+<section id="welcome" class="welcome" hidden>
+  <img src="icons/icon-512.png" alt="" width="120" height="120">
+  <h1>تفسير سورة البقرة</h1>
+  <p class="muted">تسجيلات التفسير مرتبة حسب الآيات مع صفحات المصحف</p>
+  <button id="guestBtn" class="wide">الدخول كضيف</button>
+  <button id="welcomeAdmin" class="link">دخول الأدمن</button>
+</section>
+
 <header class="top">
   <div class="brand">
     <img src="icons/icon-192.png" alt="" width="36" height="36">
@@ -88,9 +96,16 @@
 <dialog id="loginSheet" class="sheet">
   <div class="sheet-head"><h2>دخول المشرفة</h2><button class="icon-btn" data-close aria-label="إغلاق">✕</button></div>
   <form id="loginForm">
-    <label>مفتاح الدخول <input type="password" name="token" autocomplete="current-password" required dir="ltr"></label>
+    <label>اسم المستخدم <input type="text" name="user" autocomplete="username" autocapitalize="none" required dir="ltr"></label>
+    <label>كلمة المرور <input type="password" name="pass" autocomplete="current-password" required dir="ltr"></label>
     <button class="wide" type="submit">دخول</button>
     <p id="loginMsg" class="muted"></p>
+  </form>
+  <form id="keyForm" hidden>
+    <p>خطوة لمرة واحدة فقط: الصقي مفتاح GitHub ليتمكن التطبيق من حفظ التسجيلات. يُحفظ بأمان في حسابك ولن يُطلب مرة أخرى.</p>
+    <label>مفتاح GitHub <input type="password" name="token" autocomplete="off" required dir="ltr"></label>
+    <button class="wide" type="submit">حفظ</button>
+    <p id="keyMsg" class="muted"></p>
   </form>
 </dialog>
 

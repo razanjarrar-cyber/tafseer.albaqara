@@ -210,8 +210,26 @@ async function copy(t) { try { await navigator.clipboard.writeText(t); $('#share
 /* ---------- admin (uploads commit straight to the GitHub repo) ---------- */
 const REPO = 'razanjarrar-cyber/tafseer.albaqara', BRANCH = 'main';
 const GH = 'https://api.github.com/repos/' + REPO;
-const adminToken = () => store.get('ghToken', '');
-const isAdmin = () => !!adminToken();
+let ghToken = '';
+const adminToken = () => ghToken;
+const isAdmin = () => !!ghToken;
+const ADMIN_DOMAIN = '@tafseer-albaqara.app';
+const FB = 'https://www.gstatic.com/firebasejs/10.12.2/';
+let fbx = null; // lazily loaded Firebase auth + firestore
+async function firebase() {
+  if (fbx) return fbx;
+  const [{ initializeApp }, au, fs] = await Promise.all([import(FB + 'firebase-app.js'), import(FB + 'firebase-auth.js'), import(FB + 'firebase-firestore.js')]);
+  const cfg = await (await fetch('/__/firebase/init.json')).json();
+  const app = initializeApp(cfg);
+  fbx = { au, fs, auth: au.getAuth(app), db: fs.getFirestore(app) };
+  return fbx;
+}
+// The GitHub key lives in Firestore at admin/github; rules let only the admin account read or write it.
+async function loadKey() {
+  const { fs, db } = await firebase();
+  const snap = await fs.getDoc(fs.doc(db, 'admin', 'github'));
+  return snap.exists() ? snap.data().token : '';
+}
 const b64 = buf => { let s = ''; const b = new Uint8Array(buf); for (let i = 0; i < b.length; i += 0x8000) s += String.fromCharCode(...b.subarray(i, i + 0x8000)); return btoa(s); };
 const utf8b64 = str => b64(new TextEncoder().encode(str));
 async function gh(path, opts = {}) {
@@ -219,25 +237,66 @@ async function gh(path, opts = {}) {
   if (!r.ok) throw new Error((await r.json().catch(() => ({}))).message || r.status);
   return r.json();
 }
-function updateAdminUI() {
+let updateAdminUI = function () {
   $('#adminBtn').hidden = !isAdmin();
-  $('#adminLink').textContent = isAdmin() ? 'تسجيل خروج المشرفة' : 'دخول المشرفة';
+  $('#adminLink').textContent = isAdmin() ? 'تسجيل خروج الأدمن' : 'دخول الأدمن';
 }
-$('#adminLink').onclick = () => {
-  if (isAdmin()) { if (confirm('تسجيل الخروج من حساب المشرفة على هذا الجهاز؟')) { store.set('ghToken', ''); updateAdminUI(); } return; }
-  $('#loginMsg').textContent = ''; $('#loginSheet').showModal();
+async function verifyToken(t) {
+  const r = await fetch(GH, { headers: { Authorization: 'Bearer ' + t, Accept: 'application/vnd.github+json' } });
+  const j = await r.json().catch(() => ({}));
+  if (!r.ok || !j.permissions || !j.permissions.push) throw new Error('المفتاح لا يملك صلاحية الكتابة على المستودع');
+}
+$('#adminLink').onclick = async () => {
+  if (isAdmin()) {
+    if (confirm('تسجيل الخروج من حساب المشرفة على هذا الجهاز؟')) { const { au, auth } = await firebase(); await au.signOut(auth); ghToken = ''; updateAdminUI(); }
+    return;
+  }
+  $('#loginMsg').textContent = ''; $('#loginForm').hidden = false; $('#keyForm').hidden = true; $('#loginSheet').showModal();
 };
 $('#loginForm').onsubmit = async e => {
   e.preventDefault();
-  const t = new FormData(e.target).get('token').trim();
-  $('#loginMsg').textContent = 'جاري التحقق…';
+  const f = new FormData(e.target); let user = f.get('user').trim().toLowerCase();
+  if (!user.includes('@')) user += ADMIN_DOMAIN;
+  const msg = t => $('#loginMsg').textContent = t;
+  msg('جاري الدخول…');
   try {
-    const r = await fetch(GH, { headers: { Authorization: 'Bearer ' + t, Accept: 'application/vnd.github+json' } });
-    const j = await r.json();
-    if (!r.ok || !j.permissions || !j.permissions.push) throw new Error('المفتاح لا يملك صلاحية الكتابة على المستودع');
-    store.set('ghToken', t); updateAdminUI(); e.target.reset(); $('#loginSheet').close();
-  } catch (err) { $('#loginMsg').textContent = 'تعذّر الدخول: ' + err.message; }
+    const { au, auth } = await firebase();
+    await au.signInWithEmailAndPassword(auth, user, f.get('pass'));
+    e.target.reset();
+    await afterSignIn();
+  } catch (err) {
+    const c = err.code || '';
+    msg(/invalid-credential|wrong-password|user-not-found|invalid-email/.test(c) ? 'اسم المستخدم أو كلمة المرور غير صحيحة.'
+      : /too-many-requests/.test(c) ? 'محاولات كثيرة، حاولي بعد قليل.'
+      : /permission-denied/.test(c) ? 'هذا الحساب ليس حساب المشرفة.' : 'تعذّر الدخول: ' + (err.message || c));
+  }
 };
+async function afterSignIn() {
+  const t = await loadKey();
+  if (t) { ghToken = t; updateAdminUI(); $('#loginSheet').close(); return; }
+  // first time: ask once for the GitHub key and keep it in Firestore
+  $('#loginForm').hidden = true; $('#keyForm').hidden = false; $('#keyMsg').textContent = '';
+}
+$('#keyForm').onsubmit = async e => {
+  e.preventDefault();
+  const t = new FormData(e.target).get('token').trim();
+  $('#keyMsg').textContent = 'جاري التحقق…';
+  try {
+    await verifyToken(t);
+    const { fs, db } = await firebase();
+    await fs.setDoc(fs.doc(db, 'admin', 'github'), { token: t, updated: new Date().toISOString() });
+    ghToken = t; updateAdminUI(); e.target.reset(); $('#loginSheet').close();
+  } catch (err) { $('#keyMsg').textContent = 'تعذّر الحفظ: ' + (err.message || err.code); }
+};
+// keep the admin signed in across visits
+(async () => {
+  try {
+    const { au, auth } = await firebase();
+    au.onAuthStateChanged(auth, async u => {
+      if (u && !ghToken) { try { ghToken = await loadKey(); } catch {} updateAdminUI(); }
+    });
+  } catch {}
+})();
 $('#adminBtn').onclick = () => {
   const last = CLIPS.reduce((m, c) => Math.max(m, c.to), 0);
   const f = $('#uploadForm');
@@ -303,6 +362,14 @@ function openFromHash() {
 }
 window.addEventListener('hashchange', openFromHash);
 window.addEventListener('popstate', () => showPlayer(false));
+
+// welcome screen: guest or admin (skipped for shared clip links and a signed-in admin)
+function hideWelcome() { $('#welcome').hidden = true; try { sessionStorage.setItem('entered', '1'); } catch {} }
+let entered = false; try { entered = sessionStorage.getItem('entered') === '1'; } catch {}
+if (!entered && !/clip=/.test(location.hash)) $('#welcome').hidden = false;
+$('#guestBtn').onclick = hideWelcome;
+$('#welcomeAdmin').onclick = () => $('#adminLink').click();
+const _upd = updateAdminUI; updateAdminUI = () => { _upd(); if (isAdmin()) hideWelcome(); };
 
 if ('serviceWorker' in navigator) navigator.serviceWorker.register('sw.js');
 const tab = store.get('tab', 'tree'); document.querySelector(`.tabs [data-tab="${tab}"]`)?.click();

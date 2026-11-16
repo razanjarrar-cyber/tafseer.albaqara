@@ -2,11 +2,46 @@
   "hosting": {
     "site": "tafseer-albaqara",
     "public": ".",
-    "ignore": ["firebase.json", ".firebaserc", "README.md", ".github/**", "**/.*", "**/node_modules/**"],
+    "ignore": [
+      "firebase.json",
+      ".firebaserc",
+      "README.md",
+      ".github/**",
+      "**/.*",
+      "**/node_modules/**",
+      "firestore.rules"
+    ],
     "headers": [
-      { "source": "pages/**", "headers": [{ "key": "Cache-Control", "value": "public, max-age=31536000, immutable" }] },
-      { "source": "audio/**", "headers": [{ "key": "Cache-Control", "value": "public, max-age=2592000" }] },
-      { "source": "**/*.@(js|css|json|html|webmanifest)", "headers": [{ "key": "Cache-Control", "value": "no-cache" }] }
+      {
+        "source": "pages/**",
+        "headers": [
+          {
+            "key": "Cache-Control",
+            "value": "public, max-age=31536000, immutable"
+          }
+        ]
+      },
+      {
+        "source": "audio/**",
+        "headers": [
+          {
+            "key": "Cache-Control",
+            "value": "public, max-age=2592000"
+          }
+        ]
+      },
+      {
+        "source": "**/*.@(js|css|json|html|webmanifest)",
+        "headers": [
+          {
+            "key": "Cache-Control",
+            "value": "no-cache"
+          }
+        ]
+      }
     ]
+  },
+  "firestore": {
+    "rules": "firestore.rules"
   }
 }
