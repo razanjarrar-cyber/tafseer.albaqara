@@ -23,7 +23,7 @@ jobs:
       - uses: actions/cache@v4
         with:
           path: ~/.cache/whisper
-          key: whisper-small
+          key: whisper-medium
       - run: sudo apt-get install -y ffmpeg >/dev/null
       - run: pip install -r tools/requirements.txt
       - name: Transcribe and match (commits after each file)

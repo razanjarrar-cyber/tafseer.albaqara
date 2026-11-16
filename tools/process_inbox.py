@@ -43,7 +43,7 @@ def main():
     ayat = load(P('data', 'ayat.json'), [])
     clips = load(P('data', 'clips.json'), [])
     unmatched = load(P('data', 'unmatched.json'), [])
-    model = whisper.load_model('small')
+    model = whisper.load_model(os.environ.get('WHISPER_MODEL', 'medium'))
     for f in files:
         src = os.path.join(inbox, f)
         meta = load(src + '.json', {})
@@ -67,6 +67,8 @@ def main():
             shutil.move(src, P(dest))
             clips.append({'file': meta.get('file', f), 'id': cid, 'from': a, 'to': b, 'src': dest, 'title': meta.get('title', ''), 'speaker': meta.get('speaker', ''),
                           'duration': duration(P(dest)), 'added': str(datetime.date.today()), 'auto': True})
+            os.makedirs(P('data', 'transcripts'), exist_ok=True)
+            open(P('data', 'transcripts', cid + '.txt'), 'w', encoding='utf-8').write(text)
             print(f'  ayat {a}-{b} ->', dest)
         if os.path.exists(src + '.json'): os.remove(src + '.json')
         if COMMIT_EACH:
