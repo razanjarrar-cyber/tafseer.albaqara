@@ -37,6 +37,7 @@
   <section id="tree" class="view"></section>
   <section id="list" class="view" hidden></section>
 </main>
+<footer class="foot"><button id="adminLink" class="link"></button></footer>
 
 <!-- ayah sheet: recordings covering an ayah -->
 <dialog id="ayahSheet" class="sheet">
@@ -83,12 +84,21 @@
   <p id="shareMsg" class="muted"></p>
 </dialog>
 
+<!-- admin login -->
+<dialog id="loginSheet" class="sheet">
+  <div class="sheet-head"><h2>دخول المشرفة</h2><button class="icon-btn" data-close aria-label="إغلاق">✕</button></div>
+  <form id="loginForm">
+    <label>مفتاح الدخول <input type="password" name="token" autocomplete="current-password" required dir="ltr"></label>
+    <button class="wide" type="submit">دخول</button>
+    <p id="loginMsg" class="muted"></p>
+  </form>
+</dialog>
+
 <!-- admin upload -->
 <dialog id="adminSheet" class="sheet">
   <div class="sheet-head"><h2>إضافة تسجيل</h2><button class="icon-btn" data-close aria-label="إغلاق">✕</button></div>
-  <div id="authBox"></div>
-  <form id="uploadForm" hidden>
-    <label>الملف الصوتي <input type="file" name="file" accept="audio/*,video/mp4" required></label>
+  <form id="uploadForm">
+    <label>الملف الصوتي <input type="file" name="file" accept="audio/*,video/mp4,.m4a,.mp3" required></label>
     <div class="row">
       <label>من الآية <input type="number" name="from" min="1" max="286" required></label>
       <label>إلى الآية <input type="number" name="to" min="1" max="286" required></label>
@@ -96,13 +106,11 @@
     <label>العنوان (اختياري) <input type="text" name="title" placeholder="مثلاً: الدرس الأول"></label>
     <label>الشيخ / المصدر (اختياري) <input type="text" name="speaker"></label>
     <button class="wide" type="submit">رفع</button>
-    <progress id="upProg" max="100" value="0" hidden></progress>
     <p id="upMsg" class="muted"></p>
   </form>
 </dialog>
 
 <audio id="audio" preload="metadata"></audio>
-<script src="firebase-config.js"></script>
 <script type="module" src="app.js"></script>
 </body>
 </html>

@@ -3,12 +3,10 @@ const $ = (s, el = document) => el.querySelector(s);
 const ar = n => Number(n).toLocaleString('ar-EG');
 const JUZ_NAMES = { 1: 'الجزء الأول', 2: 'الجزء الثاني', 3: 'الجزء الثالث' };
 const SPEEDS = [0.75, 1, 1.25, 1.5, 1.75, 2];
-const FB_VER = '10.12.2';
 
 let AYAT = [];          // [{n,t,p,j}]
 let CLIPS = [];         // [{id,title,from,to,src,speaker,added,duration}]
 let current = null;     // clip being played
-let fb = null;          // firebase handles when configured
 
 const audio = $('#audio');
 const store = {
@@ -23,9 +21,6 @@ async function loadData() {
   try { local = await (await fetch('data/clips.json', { cache: 'no-cache' })).json(); } catch {}
   CLIPS = local.map(c => ({ ...c, origin: 'repo' }));
   render();
-  if (window.FIREBASE_CONFIG) {
-    try { await initFirebase(); } catch (e) { console.warn('Firebase', e); }
-  }
 }
 
 function sortClips() {
@@ -212,56 +207,77 @@ $('#shareFile').onclick = async () => {
 };
 async function copy(t) { try { await navigator.clipboard.writeText(t); $('#shareMsg').textContent = 'تم نسخ الرابط ✓'; } catch { prompt('انسخي الرابط:', t); } }
 
-/* ---------- firebase (optional) ---------- */
-async function initFirebase() {
-  const base = `https://www.gstatic.com/firebasejs/${FB_VER}/`;
-  const [{ initializeApp }, fsMod, stMod, authMod] = await Promise.all([
-    import(base + 'firebase-app.js'), import(base + 'firebase-firestore.js'),
-    import(base + 'firebase-storage.js'), import(base + 'firebase-auth.js')]);
-  const app = initializeApp(window.FIREBASE_CONFIG);
-  fb = { fs: fsMod, st: stMod, au: authMod, db: fsMod.getFirestore(app), storage: stMod.getStorage(app), auth: authMod.getAuth(app) };
-  const snap = await fsMod.getDocs(fsMod.collection(fb.db, 'clips'));
-  const remote = snap.docs.map(d => ({ id: d.id, ...d.data(), origin: 'firebase' }));
-  CLIPS = CLIPS.filter(c => c.origin !== 'firebase').concat(remote);
-  render(); openFromHash();
-  $('#adminBtn').hidden = false;
-  authMod.onAuthStateChanged(fb.auth, renderAuth);
+/* ---------- admin (uploads commit straight to the GitHub repo) ---------- */
+const REPO = 'razanjarrar-cyber/tafseer.albaqara', BRANCH = 'main';
+const GH = 'https://api.github.com/repos/' + REPO;
+const adminToken = () => store.get('ghToken', '');
+const isAdmin = () => !!adminToken();
+const b64 = buf => { let s = ''; const b = new Uint8Array(buf); for (let i = 0; i < b.length; i += 0x8000) s += String.fromCharCode(...b.subarray(i, i + 0x8000)); return btoa(s); };
+const utf8b64 = str => b64(new TextEncoder().encode(str));
+async function gh(path, opts = {}) {
+  const r = await fetch(GH + path, { ...opts, headers: { Authorization: 'Bearer ' + adminToken(), Accept: 'application/vnd.github+json', ...(opts.headers || {}) } });
+  if (!r.ok) throw new Error((await r.json().catch(() => ({}))).message || r.status);
+  return r.json();
 }
-function isAdmin(u) { return u && (window.ADMIN_EMAILS || []).includes(u.email); }
-function renderAuth(u) {
-  const box = $('#authBox'); box.innerHTML = '';
-  $('#uploadForm').hidden = !isAdmin(u);
-  if (!u) {
-    const b = el('button', { class: 'wide' }, 'تسجيل الدخول بحساب Google');
-    b.onclick = () => fb.au.signInWithPopup(fb.auth, new fb.au.GoogleAuthProvider());
-    box.append(el('p', { class: 'muted' }, 'رفع التسجيلات متاح للمشرفة فقط.'), b);
-  } else {
-    const out = el('button', { class: 'wide secondary' }, 'تسجيل الخروج'); out.onclick = () => fb.au.signOut(fb.auth);
-    box.append(el('p', { class: 'muted' }, isAdmin(u) ? `مسجّلة باسم ${u.email}` : `الحساب ${u.email} لا يملك صلاحية الرفع.`), out);
-  }
+function updateAdminUI() {
+  $('#adminBtn').hidden = !isAdmin();
+  $('#adminLink').textContent = isAdmin() ? 'تسجيل خروج المشرفة' : 'دخول المشرفة';
 }
-$('#adminBtn').onclick = () => $('#adminSheet').showModal();
+$('#adminLink').onclick = () => {
+  if (isAdmin()) { if (confirm('تسجيل الخروج من حساب المشرفة على هذا الجهاز؟')) { store.set('ghToken', ''); updateAdminUI(); } return; }
+  $('#loginMsg').textContent = ''; $('#loginSheet').showModal();
+};
+$('#loginForm').onsubmit = async e => {
+  e.preventDefault();
+  const t = new FormData(e.target).get('token').trim();
+  $('#loginMsg').textContent = 'جاري التحقق…';
+  try {
+    const r = await fetch(GH, { headers: { Authorization: 'Bearer ' + t, Accept: 'application/vnd.github+json' } });
+    const j = await r.json();
+    if (!r.ok || !j.permissions || !j.permissions.push) throw new Error('المفتاح لا يملك صلاحية الكتابة على المستودع');
+    store.set('ghToken', t); updateAdminUI(); e.target.reset(); $('#loginSheet').close();
+  } catch (err) { $('#loginMsg').textContent = 'تعذّر الدخول: ' + err.message; }
+};
+$('#adminBtn').onclick = () => {
+  const last = CLIPS.reduce((m, c) => Math.max(m, c.to), 0);
+  const f = $('#uploadForm');
+  if (!f.from.value && last < 286) { f.from.value = last + 1; }
+  $('#upMsg').textContent = ''; $('#adminSheet').showModal();
+};
 $('#uploadForm').onsubmit = async e => {
   e.preventDefault();
-  const f = new FormData(e.target), file = f.get('file');
+  const form = e.target, f = new FormData(form), file = f.get('file');
   const from = +f.get('from'), to = +f.get('to');
-  if (from > to) { $('#upMsg').textContent = 'رقم "من" يجب أن يكون أصغر من "إلى".'; return; }
-  const id = `${String(from).padStart(3, '0')}-${String(to).padStart(3, '0')}-${Date.now().toString(36)}`;
-  const ext = (file.name.split('.').pop() || 'm4a').toLowerCase();
-  const ref = fb.st.ref(fb.storage, `audio/${id}.${ext}`);
-  const prog = $('#upProg'); prog.hidden = false; $('#upMsg').textContent = 'جاري الرفع…';
-  const task = fb.st.uploadBytesResumable(ref, file, { contentType: file.type || 'audio/mp4' });
-  task.on('state_changed', s => prog.value = s.bytesTransferred / s.totalBytes * 100);
+  const msg = t => $('#upMsg').textContent = t;
+  if (from > to) return msg('رقم "من" يجب ألا يكون أكبر من "إلى".');
+  if (file.size > 95 * 1024 * 1024) return msg('الملف أكبر من 95 ميجا.');
+  const btn = form.querySelector('button[type=submit]'); btn.disabled = true;
   try {
-    await task;
-    const src = await fb.st.getDownloadURL(ref);
-    const duration = await new Promise(r => { const a = new Audio(); a.preload = 'metadata'; a.src = URL.createObjectURL(file); a.onloadedmetadata = () => r(Math.round(a.duration)); a.onerror = () => r(null); });
-    const doc = { from, to, src, title: f.get('title') || '', speaker: f.get('speaker') || '', duration, added: new Date().toISOString() };
-    await fb.fs.setDoc(fb.fs.doc(fb.db, 'clips', id), doc);
-    CLIPS.push({ id, ...doc, origin: 'firebase' }); render();
-    $('#upMsg').textContent = 'تم الرفع ✓'; e.target.reset(); prog.hidden = true;
-  } catch (err) { $('#upMsg').textContent = 'فشل الرفع: ' + err.message; }
+    const base = from === to ? `${from}` : `${from}-${to}`;
+    let id = base; let n = 2; while (CLIPS.some(c => c.id === id)) id = `${base}_${n++}`;
+    const ext = (file.name.split('.').pop() || 'm4a').toLowerCase().replace('mp4', 'm4a');
+    const path = `audio/${id}.${ext}`;
+    msg('جاري قراءة الملف…');
+    const duration = await new Promise(r => { const a = new Audio(); a.preload = 'metadata'; a.src = URL.createObjectURL(file); a.onloadedmetadata = () => r(Math.round(a.duration) || null); a.onerror = () => r(null); });
+    msg('جاري رفع الملف الصوتي…');
+    await gh('/contents/' + path, { method: 'PUT', body: JSON.stringify({ message: `Add recording ${id} (ayat ${from}-${to})`, content: b64(await file.arrayBuffer()), branch: BRANCH }) });
+    msg('جاري تحديث قائمة التسجيلات…');
+    const clip = { id, from, to, src: path, title: f.get('title') || '', speaker: f.get('speaker') || '', duration, added: new Date().toISOString().slice(0, 10) };
+    for (let attempt = 0; attempt < 3; attempt++) {
+      const cur = await gh('/contents/data/clips.json?ref=' + BRANCH, { cache: 'no-store' });
+      const list = JSON.parse(new TextDecoder().decode(Uint8Array.from(atob(cur.content.replace(/\n/g, '')), c => c.charCodeAt(0))));
+      list.push(clip); list.sort((a, b) => a.from - b.from || a.to - b.to);
+      try {
+        await gh('/contents/data/clips.json', { method: 'PUT', body: JSON.stringify({ message: `List recording ${id}`, content: utf8b64(JSON.stringify(list, null, 2) + '\n'), sha: cur.sha, branch: BRANCH }) });
+        break;
+      } catch (err) { if (attempt === 2) throw err; }
+    }
+    CLIPS.push({ ...clip, src: URL.createObjectURL(file), origin: 'local' }); render();
+    form.reset(); msg('تم الرفع ✓ سيظهر للجميع خلال دقيقتين تقريباً.');
+  } catch (err) { msg('فشل الرفع: ' + err.message); }
+  btn.disabled = false;
 };
+updateAdminUI();
 
 /* ---------- misc ---------- */
 function el(tag, attrs = {}, text) {

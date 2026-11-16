@@ -9,21 +9,20 @@
 - أكثر من تسجيل للآية الواحدة، وتُرتَّب التسجيلات تصاعدياً حسب ترتيب الآيات.
 - يعمل دون اتصال بعد أول فتح (الواجهة والآيات وصفحات المصحف).
 
-## إضافة تسجيلات
+## الحسابات
 
-**الطريقة 1: من داخل التطبيق (Firebase).** بعد تعبئة `firebase-config.js` ونشر `firestore.rules` و`storage.rules` يظهر زر ＋ في الأعلى، فتسجّل المشرفة الدخول بحساب Google وترفع الملف وتحدد مدى الآيات.
+- **الضيوف:** يتصفحون ويستمعون ويشاركون بدون أي تسجيل دخول.
+- **المشرفة:** من رابط "دخول المشرفة" أسفل الصفحة، بمفتاح GitHub (fine-grained token) صلاحيته Contents: Read and write على هذا المستودع فقط. يُحفظ المفتاح على جهاز المشرفة فقط، ويظهر بعده زر ＋ لرفع تسجيل وتحديد آياته. الرفع يضيف الملف إلى `audio/` ويحدّث `data/clips.json`، ثم يُنشر الموقع تلقائياً.
 
-**الطريقة 2: من المستودع.** ضع الملف في `audio/` وأضف سطراً في `data/clips.json`:
+يمكن أيضاً إضافة تسجيل يدوياً بوضع الملف في `audio/` وإضافة سطر في `data/clips.json`:
 
 ```json
-{"id": "a3", "from": 30, "to": 34, "src": "audio/a3.m4a", "title": "", "speaker": "", "duration": 600, "added": "2026-11-16"}
+{"id": "135-137", "from": 135, "to": 137, "src": "audio/135-137.m4a", "title": "", "speaker": "", "duration": 600, "added": "2026-11-16"}
 ```
 
-## إعداد Firebase
+## الاستضافة
 
-1. أنشئ مشروعاً في [Firebase Console](https://console.firebase.google.com) وأضف تطبيق ويب، ثم انسخ `firebaseConfig` إلى `firebase-config.js` وأضف بريدك إلى `ADMIN_EMAILS`.
-2. فعّل **Authentication ← Google**، وأضف نطاق الموقع (مثل `razanjarrar-cyber.github.io`) إلى Authorized domains.
-3. فعّل **Firestore** و**Storage**، وانسخ القواعد من `firestore.rules` و`storage.rules` بعد وضع بريدك فيها.
+Firebase Hosting (خطة Spark المجانية)، والنشر تلقائي عند كل تحديث على `main` عبر `.github/workflows/deploy.yml`. يحتاج سراً في المستودع باسم `FIREBASE_SERVICE_ACCOUNT`، ومعرّف المشروع في `.firebaserc`.
 
 ## المصادر
 
