@@ -28,7 +28,7 @@ def match(transcript, ayat):
         scores.append(c / len(g) if g else 0); counts.append(c)
         tri.append(len(grams(w, 3) & tg3))
     # well-recited ayat: a good share of the ayah's word pairs, and not just a stock phrase
-    good = [i for i in range(len(ayat)) if scores[i] >= 0.3 and counts[i] >= 3]
+    good = [i for i in range(len(ayat)) if (scores[i] >= 0.3 and counts[i] >= 3) or (counts[i] >= 5 and scores[i] >= 0.12)]
     if good:
         blocks, cur = [], [good[0]]
         for i in good[1:]:
