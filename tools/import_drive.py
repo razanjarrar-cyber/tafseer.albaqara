@@ -6,7 +6,7 @@ root = os.path.join(os.path.dirname(__file__), '..')
 inbox = os.path.join(root, 'audio', 'inbox'); os.makedirs(inbox, exist_ok=True)
 tmp = tempfile.mkdtemp()
 if '/folders/' in url:
-    gdown.download_folder(url, output=tmp, quiet=False, remaining_ok=True)
+    gdown.download_folder(url, output=tmp, quiet=False, retries=3)
 else:
     gdown.download(url, output=tmp + '/', quiet=False, fuzzy=True)
 AUDIO = ('.m4a', '.mp3', '.mp4', '.aac', '.ogg', '.wav', '.opus', '.webm', '.amr', '.3gp')
