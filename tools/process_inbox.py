@@ -25,6 +25,16 @@ def duration(path):
     try: return round(float(out))
     except ValueError: return None
 
+COMMIT_EACH = '--commit-each' in sys.argv
+
+def commit(msg):
+    run = lambda *a: subprocess.run(a, cwd=ROOT, check=False)
+    run('git', 'add', '-A', 'audio', 'data')
+    if subprocess.run(['git', 'diff', '--cached', '--quiet'], cwd=ROOT).returncode == 0: return
+    run('git', 'commit', '-q', '-m', msg)
+    for _ in range(3):
+        if run('git', 'pull', '--rebase', '-q').returncode == 0 and run('git', 'push', '-q').returncode == 0: return
+
 def main():
     import whisper
     inbox = P('audio', 'inbox')
@@ -45,7 +55,7 @@ def main():
             os.makedirs(P('audio', 'unmatched'), exist_ok=True)
             dest = os.path.join('audio', 'unmatched', f)
             shutil.move(src, P(dest))
-            unmatched.append({'file': dest, 'title': meta.get('title', ''), 'speaker': meta.get('speaker', ''), 'added': str(datetime.date.today())})
+            unmatched.append({'file': dest, 'original': meta.get('file', f), 'title': meta.get('title', ''), 'speaker': meta.get('speaker', ''), 'added': str(datetime.date.today())})
             print('  no match ->', dest)
         else:
             a, b = rng
@@ -55,10 +65,15 @@ def main():
             while cid in ids: cid = f'{base}_{n}'; n += 1
             dest = f'audio/{cid}{ext}'
             shutil.move(src, P(dest))
-            clips.append({'id': cid, 'from': a, 'to': b, 'src': dest, 'title': meta.get('title', ''), 'speaker': meta.get('speaker', ''),
+            clips.append({'file': meta.get('file', f), 'id': cid, 'from': a, 'to': b, 'src': dest, 'title': meta.get('title', ''), 'speaker': meta.get('speaker', ''),
                           'duration': duration(P(dest)), 'added': str(datetime.date.today()), 'auto': True})
             print(f'  ayat {a}-{b} ->', dest)
         if os.path.exists(src + '.json'): os.remove(src + '.json')
+        if COMMIT_EACH:
+            clips.sort(key=lambda c: (c['from'], c['to']))
+            save(P('data', 'clips.json'), clips)
+            if unmatched: save(P('data', 'unmatched.json'), unmatched)
+            commit(f'Detect ayat: {f}')
     clips.sort(key=lambda c: (c['from'], c['to']))
     save(P('data', 'clips.json'), clips)
     if unmatched: save(P('data', 'unmatched.json'), unmatched)

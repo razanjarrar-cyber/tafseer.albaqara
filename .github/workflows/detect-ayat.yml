@@ -4,6 +4,10 @@ on:
     branches: [main]
     paths: ['audio/inbox/**']
   workflow_dispatch:
+    inputs:
+      drive_url:
+        description: 'Google Drive folder or file link to import (optional)'
+        required: false
 concurrency:
   group: detect-ayat
   cancel-in-progress: false
@@ -12,7 +16,7 @@ permissions:
 jobs:
   detect:
     runs-on: ubuntu-latest
-    timeout-minutes: 60
+    timeout-minutes: 350
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
@@ -25,13 +29,14 @@ jobs:
           path: ~/.cache/whisper
           key: whisper-small
       - run: sudo apt-get install -y ffmpeg >/dev/null
-      - run: pip install -r tools/requirements.txt
-      - run: python tools/process_inbox.py
-      - name: Commit results
+      - run: pip install -r tools/requirements.txt gdown
+      - name: Import from Google Drive
+        if: inputs.drive_url != ''
+        env:
+          URL: ${{ inputs.drive_url }}
+        run: python tools/import_drive.py "$URL"
+      - name: Transcribe and match (commits after each file)
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add -A audio data
-          git diff --cached --quiet && exit 0
-          git commit -m "Detect ayat for new recordings"
-          for i in 1 2 3; do git pull --rebase -q && git push && break; sleep 5; done
+          python tools/process_inbox.py --commit-each
