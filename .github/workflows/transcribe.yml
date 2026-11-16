@@ -1,0 +1,65 @@
+name: Transcribe files
+on:
+  workflow_dispatch:
+    inputs:
+      files:
+        description: 'Glob of audio files in the repo'
+        default: 'audio/unmatched/*.m4a'
+      model:
+        description: 'Whisper model'
+        default: 'medium'
+      shards:
+        default: '15'
+permissions:
+  contents: write
+jobs:
+  list:
+    runs-on: ubuntu-latest
+    outputs:
+      matrix: ${{ steps.l.outputs.matrix }}
+    steps:
+      - uses: actions/checkout@v4
+      - id: l
+        env: { G: '${{ inputs.files }}', N: '${{ inputs.shards }}' }
+        run: echo "matrix=$(python3 tools/transcribe_batch.py list "$G" "$N")" >> "$GITHUB_OUTPUT"
+      - uses: actions/upload-artifact@v4
+        with: { name: shards, path: shards.json }
+  shard:
+    needs: list
+    runs-on: ubuntu-latest
+    timeout-minutes: 340
+    strategy:
+      fail-fast: false
+      matrix:
+        k: ${{ fromJson(needs.list.outputs.matrix) }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+          cache: pip
+          cache-dependency-path: tools/requirements.txt
+      - uses: actions/cache@v4
+        with: { path: ~/.cache/whisper, key: 'whisper-${{ inputs.model }}' }
+      - run: sudo apt-get install -y ffmpeg >/dev/null
+      - run: pip install -r tools/requirements.txt
+      - uses: actions/download-artifact@v4
+        with: { name: shards }
+      - run: python tools/transcribe_batch.py shard ${{ matrix.k }}
+        env: { WHISPER_MODEL: '${{ inputs.model }}' }
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with: { name: 'tr-${{ matrix.k }}', path: 'out/${{ matrix.k }}' }
+  commit:
+    needs: shard
+    if: always()
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with: { pattern: 'tr-*', path: tr, merge-multiple: true }
+      - run: |
+          mkdir -p data/transcripts && cp tr/*.txt data/transcripts/
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add data/transcripts && git commit -q -m "Add transcripts" && for i in 1 2 3; do git pull --rebase -q && git push -q && break; sleep 5; done

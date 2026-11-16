@@ -12,7 +12,8 @@
       "firestore.rules",
       "tools/**",
       "audio/inbox/**",
-      "audio/unmatched/**"
+      "audio/unmatched/**",
+      "data/transcripts/**"
     ],
     "headers": [
       {
