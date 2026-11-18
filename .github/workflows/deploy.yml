@@ -14,6 +14,14 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+      - name: Free hosting storage (keep 2 versions)
+        continue-on-error: true
+        env: { SA: '${{ secrets.FIREBASE_SERVICE_ACCOUNT }}' }
+        run: |
+          printf '%s' "$SA" > "$RUNNER_TEMP/sa.json"
+          pip install -q google-auth requests
+          SA_FILE="$RUNNER_TEMP/sa.json" python3 tools/hosting_cleanup.py
+          rm -f "$RUNNER_TEMP/sa.json"
       - uses: FirebaseExtended/action-hosting-deploy@v0
         with:
           repoToken: ${{ secrets.GITHUB_TOKEN }}
