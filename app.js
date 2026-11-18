@@ -37,7 +37,7 @@ function render() {
   sortClips();
   const covered = new Set(); CLIPS.forEach(c => { for (let i = c.from; i <= c.to; i++) covered.add(i); });
   $('#stats').textContent = `${ar(CLIPS.length)} تسجيل · ${ar(covered.size)} من ${ar(286)} آية مغطاة`;
-  renderTree(); renderList();
+  renderTree(); renderList(); renderSaved();
 }
 
 function renderTree() {
@@ -93,13 +93,15 @@ function renderList() {
   }
 }
 function clipCard(c) {
-  const b = el('button', { class: 'clip' + (current && current.id === c.id ? ' current' : '') });
+  const card = el('div', { class: 'clip' + (current && current.id === c.id ? ' current' : ''), 'data-clip': c.id });
+  const main = el('button', { class: 'clip-main' });
   const info = el('span', { class: 'info' });
   info.append(el('strong', {}, clipTitle(c)),
     el('span', { class: 'muted' }, [rangeText(c), `صفحة ${pagesFor(c).map(ar).join('، ')}`, c.speaker, c.duration ? fmt(c.duration) : ''].filter(Boolean).join(' · ')));
-  b.append(el('span', { class: 'play-ic' }, '▶'), info);
-  b.onclick = () => { closeDialogs(); play(c, true); };
-  return b;
+  main.append(el('span', { class: 'play-ic' }, '▶'), info);
+  main.onclick = () => { closeDialogs(); play(c, true); };
+  card.append(main, dlButton(c));
+  return card;
 }
 
 function openAyah(a) {
@@ -117,6 +119,7 @@ function play(c, expand) {
   if (!current || current.id !== c.id) {
     current = c;
     audio.src = c.src;
+    offlineURL(c).then(u => { if (u && current === c) { const t = audio.currentTime, p = !audio.paused; audio.src = u; if (t) audio.currentTime = t; if (p) audio.play().catch(() => {}); } });
     audio.playbackRate = store.get('speed', 1);
     const pos = store.get('pos:' + c.id, 0);
     audio.addEventListener('loadedmetadata', () => { if (pos && pos < audio.duration - 5) audio.currentTime = pos; }, { once: true });
@@ -125,7 +128,7 @@ function play(c, expand) {
     buildPages(c);
     setMediaSession(c);
     history.replaceState(null, '', '#clip=' + encodeURIComponent(c.id));
-    renderList();
+    renderList(); paintPlayerDl();
   }
   audio.play().catch(() => {});
   $('#mini').hidden = false;
@@ -182,6 +185,93 @@ function setMediaSession(c) {
   navigator.mediaSession.setActionHandler('nexttrack', () => $('#next').click());
 }
 
+/* ---------- offline downloads (kept in the app's own storage) ---------- */
+const OFF = 'tafseer-offline';
+const SAVED_KEY = 'saved';
+let saved = store.get(SAVED_KEY, {});          // id -> {size, at}
+const downloading = {};                       // id -> percent
+const ICON_DL = '<svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M7 18a4.5 4.5 0 0 1-.6-8.96A6 6 0 0 1 18 8.5a4 4 0 0 1-.5 9.5"/><path d="M12 11v8m-3-3 3 3 3-3"/></svg>';
+const ICON_OK = '<svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M7 18a4.5 4.5 0 0 1-.6-8.96A6 6 0 0 1 18 8.5a4 4 0 0 1-.5 9.5"/><path d="m9 15 2.2 2.2L15.5 13"/></svg>';
+const absURL = u => new URL(u, location.href).href;
+async function offlineBlob(c) {
+  if (!saved[c.id] || !('caches' in window)) return null;
+  try { const r = await (await caches.open(OFF)).match(absURL(c.src)); return r ? await r.blob() : null; } catch { return null; }
+}
+async function offlineURL(c) { const b = await offlineBlob(c); return b ? URL.createObjectURL(b) : null; }
+function dlButton(c) {
+  const b = el('button', { class: 'dl-btn', 'data-dl': c.id, 'aria-label': 'تنزيل للاستماع دون إنترنت' });
+  paintDl(b, c.id);
+  b.onclick = e => { e.stopPropagation(); saved[c.id] ? confirmRemove(c) : download(c); };
+  return b;
+}
+function paintDl(b, id) {
+  b.classList.toggle('saved', !!saved[id]); b.classList.toggle('busy', id in downloading);
+  if (id in downloading) { b.innerHTML = `<span class="pct">${downloading[id]}%</span>`; b.title = 'جاري التنزيل'; }
+  else { b.innerHTML = saved[id] ? ICON_OK : ICON_DL; b.title = saved[id] ? 'محفوظ على الجهاز' : 'تنزيل للاستماع دون إنترنت'; }
+}
+const repaint = id => { document.querySelectorAll(`[data-dl="${CSS.escape(id)}"]`).forEach(b => paintDl(b, id)); paintPlayerDl(); };
+function paintPlayerDl() { if (current) { const b = $('#pDl'); b.setAttribute('data-dl', current.id); paintDl(b, current.id); } }
+$('#pDl').onclick = () => current && (saved[current.id] ? confirmRemove(current) : download(current));
+async function download(c) {
+  if (c.id in downloading) return;
+  if (!navigator.onLine) return toast('لا يوجد اتصال بالإنترنت الآن.');
+  downloading[c.id] = 0; repaint(c.id);
+  try {
+    if (navigator.storage && navigator.storage.persist) navigator.storage.persist().catch(() => {});
+    const res = await fetch(c.src, { cache: 'no-store' });
+    if (!res.ok) throw new Error(res.status);
+    const total = +res.headers.get('content-length') || 0, reader = res.body.getReader(), parts = []; let got = 0;
+    for (;;) {
+      const { done, value } = await reader.read(); if (done) break;
+      parts.push(value); got += value.length;
+      if (total) { const p = Math.floor(got / total * 100); if (p !== downloading[c.id]) { downloading[c.id] = p; repaint(c.id); } }
+    }
+    const blob = new Blob(parts, { type: res.headers.get('content-type') || 'audio/mp4' });
+    const cache = await caches.open(OFF);
+    await cache.put(absURL(c.src), new Response(blob, { headers: { 'Content-Type': blob.type, 'Content-Length': blob.size } }));
+    // the mushaf pages for this clip, so they show offline too
+    await Promise.all(pagesFor(c).map(p => cache.add(absURL(`pages/${String(p).padStart(2, '0')}.webp`)).catch(() => {})));
+    saved[c.id] = { size: blob.size, at: Date.now() }; store.set(SAVED_KEY, saved);
+    toast('تم الحفظ للاستماع دون إنترنت ✓');
+  } catch (e) {
+    toast(/quota/i.test(e.name + e.message) ? 'لا توجد مساحة كافية على الجهاز. احذفي بعض المحفوظات.' : 'تعذّر التنزيل، حاولي مرة أخرى.');
+  }
+  delete downloading[c.id]; repaint(c.id); renderSaved();
+}
+async function removeSaved(ids) {
+  try {
+    const cache = await caches.open(OFF);
+    for (const id of ids) { const c = CLIPS.find(x => x.id === id); if (c) await cache.delete(absURL(c.src)); delete saved[id]; }
+  } catch {}
+  store.set(SAVED_KEY, saved); ids.forEach(repaint); renderSaved();
+}
+function confirmRemove(c) { if (confirm(`حذف "${clipTitle(c)}" من المحفوظات على الجهاز؟`)) removeSaved([c.id]); }
+const fmtSize = n => n >= 1048576 ? `${(n / 1048576).toLocaleString('ar-EG', { maximumFractionDigits: 1 })} ميجا` : `${Math.ceil(n / 1024).toLocaleString('ar-EG')} كيلو`;
+async function renderSaved() {
+  const root = $('#saved'); if (!root) return; root.innerHTML = '';
+  const ids = Object.keys(saved).filter(id => CLIPS.some(c => c.id === id));
+  const used = ids.reduce((s, id) => s + (saved[id].size || 0), 0);
+  const head = el('div', { class: 'saved-head' });
+  let free = '';
+  try { const est = await navigator.storage.estimate(); if (est.quota) free = ` · المساحة المتاحة للتطبيق ${fmtSize(Math.max(0, est.quota - est.usage))}`; } catch {}
+  head.append(el('p', {}, `${ar(ids.length)} تسجيل محفوظ · ${fmtSize(used)}${free}`));
+  if (ids.length) { const all = el('button', { class: 'pill danger' }, 'حذف الكل'); all.onclick = () => confirm('حذف كل التسجيلات المحفوظة من الجهاز؟') && removeSaved(ids); head.append(all); }
+  root.append(head);
+  if (!ids.length) { root.append(el('p', { class: 'empty-note' }, 'لا توجد تسجيلات محفوظة بعد. اضغطي على أيقونة السحابة بجانب أي تسجيل لحفظه والاستماع له دون إنترنت.')); return; }
+  CLIPS.filter(c => saved[c.id]).forEach(c => {
+    const card = clipCard(c);
+    const del = el('button', { class: 'dl-btn del', 'aria-label': 'حذف من الجهاز', title: 'حذف من الجهاز' }, '🗑');
+    del.onclick = e => { e.stopPropagation(); confirmRemove(c); };
+    card.querySelector('.muted').textContent += ` · ${fmtSize(saved[c.id].size)}`;
+    card.replaceChild(del, card.querySelector('.dl-btn'));
+    root.append(card);
+  });
+}
+let toastT;
+function toast(t) { const d = $('#toast'); d.textContent = t; d.hidden = false; clearTimeout(toastT); toastT = setTimeout(() => d.hidden = true, 3500); }
+const netState = () => document.body.classList.toggle('offline', !navigator.onLine);
+addEventListener('online', netState); addEventListener('offline', netState); netState();
+
 /* ---------- share ---------- */
 const clipUrl = c => location.origin + location.pathname + '#clip=' + encodeURIComponent(c.id);
 $('#pShare').onclick = () => { $('#shareMsg').textContent = ''; $('#shareSheet').showModal(); };
@@ -193,7 +283,7 @@ $('#copyLink').onclick = () => copy(clipUrl(current));
 $('#shareFile').onclick = async () => {
   const c = current; $('#shareMsg').textContent = 'جاري تجهيز الملف…';
   try {
-    const blob = await (await fetch(c.src)).blob();
+    const blob = (await offlineBlob(c)) || await (await fetch(c.src)).blob();
     const ext = (blob.type.split('/')[1] || 'm4a').replace('mpeg', 'mp3').replace('mp4', 'm4a');
     const file = new File([blob], `تفسير البقرة ${c.from}-${c.to}.${ext}`, { type: blob.type || 'audio/mp4' });
     if (navigator.canShare && navigator.canShare({ files: [file] })) {

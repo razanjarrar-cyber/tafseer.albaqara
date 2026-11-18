@@ -114,3 +114,19 @@ input[type=password]{display:block;width:100%;margin-top:4px;padding:10px;border
 .welcome h1{margin:8px 0 0;font-size:1.6rem;color:var(--accent)}
 .welcome .wide{max-width:320px;margin-top:24px;padding:14px;font-size:1.1rem}
 .welcome .link{margin-top:6px;font-size:.95rem}
+/* clip card with download button */
+.clip{padding:0;gap:0}
+.clip-main{flex:1;display:flex;gap:12px;align-items:center;background:none;border:0;padding:12px;text-align:right;min-width:0;color:inherit}
+.dl-btn{flex:none;width:44px;height:44px;margin-inline-end:8px;border-radius:50%;border:0;background:var(--chip);color:var(--chip-ink);display:grid;place-items:center;font-size:1rem}
+.dl-btn.saved{background:var(--accent);color:#fff}
+@media (prefers-color-scheme:dark){.dl-btn.saved{color:#0d1a14}}
+.dl-btn.busy{background:var(--chip)}
+.dl-btn .pct{font-size:.72rem;font-weight:600}
+.player-head .dl-btn{margin:0;width:40px;height:40px}
+.saved-head{display:flex;justify-content:space-between;align-items:center;gap:10px;margin:12px 4px}
+.saved-head p{margin:0;color:var(--muted);font-size:.85rem}
+.pill.danger{background:#f6e3e1;color:#9b2c22;border-color:#ecc9c5}
+.toast{position:fixed;left:16px;right:16px;bottom:calc(90px + env(safe-area-inset-bottom));z-index:40;margin:0 auto;max-width:420px;background:var(--ink);color:var(--bg);padding:10px 14px;border-radius:12px;text-align:center;font-size:.9rem}
+body.offline .top::after{content:"بدون إنترنت";position:absolute;left:16px;bottom:-22px;font-size:.72rem;background:var(--accent-2);color:#fff;padding:2px 8px;border-radius:999px}
+.top{position:sticky}
+.pill.danger{white-space:nowrap}

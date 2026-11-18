@@ -39,11 +39,13 @@
 <nav class="tabs" role="tablist">
   <button role="tab" data-tab="tree" class="active">شجرة الآيات</button>
   <button role="tab" data-tab="list">التسجيلات</button>
+  <button role="tab" data-tab="saved">المحفوظة</button>
 </nav>
 
 <main>
   <section id="tree" class="view"></section>
   <section id="list" class="view" hidden></section>
+  <section id="saved" class="view" hidden></section>
 </main>
 <footer class="foot"><button id="adminLink" class="link"></button></footer>
 
@@ -59,6 +61,7 @@
   <div class="player-head">
     <button id="playerMin" class="icon-btn" aria-label="تصغير">⌄</button>
     <div class="player-title"><strong id="pTitle"></strong><span id="pRange" class="muted"></span></div>
+    <button id="pDl" class="dl-btn" aria-label="تنزيل للاستماع دون إنترنت"></button>
     <button id="pShare" class="icon-btn" aria-label="مشاركة">⤴</button>
   </div>
   <div id="pages" class="pages" dir="rtl"></div>
@@ -126,6 +129,7 @@
   </form>
 </dialog>
 
+<div id="toast" class="toast" hidden role="status"></div>
 <audio id="audio" preload="metadata"></audio>
 <script type="module" src="app.js"></script>
 </body>
