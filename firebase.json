@@ -1,48 +1,78 @@
 {
-  "hosting": {
-    "site": "tafseer-albaqara",
-    "public": ".",
-    "ignore": [
-      "firebase.json",
-      ".firebaserc",
-      "README.md",
-      ".github/**",
-      "**/.*",
-      "**/node_modules/**",
-      "firestore.rules",
-      "tools/**",
-      "audio/inbox/**",
-      "audio/unmatched/**",
-      "data/transcripts/**"
-    ],
-    "headers": [
-      {
-        "source": "pages/**",
-        "headers": [
-          {
-            "key": "Cache-Control",
-            "value": "public, max-age=31536000, immutable"
-          }
-        ]
-      },
-      {
-        "source": "audio/**",
-        "headers": [
-          {
-            "key": "Cache-Control",
-            "value": "public, max-age=2592000"
-          }
-        ]
-      },
-      {
-        "source": "**/*.@(js|css|json|html|webmanifest)",
-        "headers": [
-          {
-            "key": "Cache-Control",
-            "value": "no-cache"
-          }
-        ]
-      }
-    ]
-  }
+  "hosting": [
+    {
+      "site": "tafseer-albaqara",
+      "public": ".",
+      "ignore": [
+        "firebase.json",
+        ".firebaserc",
+        "README.md",
+        ".github/**",
+        "**/.*",
+        "**/node_modules/**",
+        "firestore.rules",
+        "tools/**",
+        "audio/inbox/**",
+        "audio/unmatched/**",
+        "data/transcripts/**",
+        "redirect/**"
+      ],
+      "headers": [
+        {
+          "source": "pages/**",
+          "headers": [
+            {
+              "key": "Cache-Control",
+              "value": "public, max-age=31536000, immutable"
+            }
+          ]
+        },
+        {
+          "source": "audio/**",
+          "headers": [
+            {
+              "key": "Cache-Control",
+              "value": "public, max-age=2592000"
+            }
+          ]
+        },
+        {
+          "source": "**/*.@(js|css|json|html|webmanifest)",
+          "headers": [
+            {
+              "key": "Cache-Control",
+              "value": "no-cache"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "site": "tafseer-albaraqa",
+      "public": "redirect",
+      "headers": [
+        {
+          "source": "sw.js",
+          "headers": [
+            {
+              "key": "Cache-Control",
+              "value": "no-cache"
+            }
+          ]
+        }
+      ],
+      "redirects": [
+        {
+          "source": "/",
+          "destination": "https://tafseer-albaqara.web.app/",
+          "type": 301
+        },
+        {
+          "source": "/index.html",
+          "destination": "https://tafseer-albaqara.web.app/",
+          "type": 301
+        }
+      ]
+    }
+  ]
 }
