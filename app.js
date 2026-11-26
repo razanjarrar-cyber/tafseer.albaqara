@@ -365,7 +365,7 @@ $('#loginForm').onsubmit = async e => {
 };
 async function afterSignIn() {
   const t = await loadKey();
-  if (t) { ghToken = t; updateAdminUI(); $('#loginSheet').close(); return; }
+  if (t) { ghToken = t; updateAdminUI(); hideWelcome(); $('#loginSheet').close(); return; }
   // first time: ask once for the GitHub key and keep it in Firestore
   $('#loginForm').hidden = true; $('#keyForm').hidden = false; $('#keyMsg').textContent = '';
 }
@@ -377,7 +377,7 @@ $('#keyForm').onsubmit = async e => {
     await verifyToken(t);
     const { fs, db } = await firebase();
     await fs.setDoc(fs.doc(db, 'admin', 'github'), { token: t, updated: new Date().toISOString() });
-    ghToken = t; updateAdminUI(); e.target.reset(); $('#loginSheet').close();
+    ghToken = t; updateAdminUI(); hideWelcome(); e.target.reset(); $('#loginSheet').close();
   } catch (err) { $('#keyMsg').textContent = 'تعذّر الحفظ: ' + (err.message || err.code); }
 };
 // keep the admin signed in across visits
@@ -468,9 +468,15 @@ window.addEventListener('popstate', () => showPlayer(false));
 function hideWelcome() { $('#welcome').hidden = true; try { sessionStorage.setItem('entered', '1'); } catch {} }
 let entered = false; try { entered = sessionStorage.getItem('entered') === '1'; } catch {}
 if (!entered && !/clip=/.test(location.hash)) $('#welcome').hidden = false;
-$('#guestBtn').onclick = hideWelcome;
-$('#welcomeAdmin').onclick = () => $('#adminLink').click();
-const _upd = updateAdminUI; updateAdminUI = () => { _upd(); if (isAdmin()) hideWelcome(); };
+// guest = no admin controls: end any admin session left on this device
+$('#guestBtn').onclick = async () => {
+  hideWelcome();
+  ghToken = ''; updateAdminUI();
+  try { const { au, auth } = await firebase(); await au.signOut(auth); } catch {}
+  ghToken = ''; updateAdminUI();
+};
+$('#welcomeAdmin').onclick = () => isAdmin() ? hideWelcome() : $('#adminLink').click();
+
 
 if ('serviceWorker' in navigator) navigator.serviceWorker.register('sw.js');
 const tab = store.get('tab', 'tree'); document.querySelector(`.tabs [data-tab="${tab}"]`)?.click();
